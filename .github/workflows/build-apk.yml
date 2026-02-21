@@ -23,63 +23,29 @@ jobs:
         with:
           node-version: '20'
 
-      - name: Check Node and npm versions
-        run: |
-          node --version
-          npm --version
-
       - name: Install dependencies
-        run: |
-          npm install --legacy-peer-deps --loglevel=error
-        env:
-          NODE_ENV: development
-
-      - name: List installed packages
-        run: npm list --depth=0
+        run: npm install --legacy-peer-deps
 
       - name: Build uni-app for App
-        id: build
         run: |
-          echo "Starting build..."
-          npm run build:app-plus 2>&1 | tee build.log
-          echo "Build exit code: $?"
-        continue-on-error: true
-
-      - name: Check build output
-        run: |
-          echo "=== Build log ==="
-          cat build.log 2>/dev/null || echo "No build log"
-          echo "=== Build directory ==="
-          ls -la dist/build/ 2>/dev/null || echo "No dist/build directory"
-          ls -la dist/build/app/ 2>/dev/null || echo "No dist/build/app directory"
-
-      - name: Setup Java for Android SDK
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '17'
-        if: success()
+          echo "Starting uni-app build..."
+          npm run build:app-plus
+          echo "Build completed"
+          ls -la dist/build/app/ || echo "Build output not found"
 
       - name: Collect build outputs
         if: always()
         run: |
           mkdir -p output
           find . -name "*.apk" -type f -exec cp {} output/ \; 2>/dev/null || true
-          cp -r dist/build/app/* output/ 2>/dev/null || true
+          cp -r dist/build/app/* output/ 2>/dev/null || echo "No app build files"
           
-          cat > output/BUILD_INFO.txt << EOF
-          App ID: $APP_ID
-          App Name: $APP_NAME
-          Build Date: $(date)
+          echo "App ID: $APP_ID" > output/BUILD_INFO.txt
+          echo "App Name: $APP_NAME" >> output/BUILD_INFO.txt
+          echo "Build Date: $(date)" >> output/BUILD_INFO.txt
           
-          打包说明：
-          1. 下载 output 文件夹
-          2. 使用 HBuilderX 打开项目
-          3. 发行 -> 原生App-云打包
-          4. 或访问 https://dev.dcloud.net.cn/ 在线打包
-          EOF
-          
-          ls -la output/
+          echo "=== Output files ==="
+          ls -la output/ || echo "No output"
 
       - name: Upload build artifacts
         if: always()
