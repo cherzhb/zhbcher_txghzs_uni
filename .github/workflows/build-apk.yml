@@ -8,7 +8,6 @@ on:
 env:
   APP_ID: __UNI__TXGHZS
   APP_NAME: 退休规划助手
-  NODE_ENV: production
 
 jobs:
   build:
@@ -31,34 +30,33 @@ jobs:
           npm install --legacy-peer-deps
 
       - name: Build uni-app for App
-        id: build
-        run: |
-          echo "Starting build..."
-          npx uni build -p app-plus 2>&1 || echo "Build failed with exit code $?"
-          echo "Build step completed"
-        continue-on-error: true
+        run: npx uni build -p app-plus
 
-      - name: Check build output
+      - name: Verify build output
         run: |
-          echo "=== Checking build output ==="
-          ls -la dist/build/ 2>/dev/null || echo "No dist/build directory"
-          ls -la dist/build/app/ 2>/dev/null || echo "No dist/build/app directory"
+          echo "=== Build output verification ==="
+          if [ -d "dist/build/app" ]; then
+            echo "✅ Build directory exists"
+            ls -la dist/build/app/
+            du -sh dist/build/app/
+          else
+            echo "❌ Build directory not found"
+            exit 1
+          fi
 
       - name: Collect build outputs
-        if: always()
         run: |
           mkdir -p output
-          find . -name "*.apk" -type f -exec cp {} output/ \; 2>/dev/null || true
-          cp -r dist/build/app/* output/ 2>/dev/null || echo "No app build files"
+          cp -r dist/build/app/* output/
           
           echo "App ID: $APP_ID" > output/BUILD_INFO.txt
+          echo "App Name: $APP_NAME" >> output/BUILD_INFO.txt
           echo "Build Date: $(date)" >> output/BUILD_INFO.txt
           
           echo "=== Output files ==="
-          ls -la output/ || echo "No output"
+          du -sh output/
 
       - name: Upload build artifacts
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: txghzs-app-build
