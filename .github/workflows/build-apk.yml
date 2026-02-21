@@ -27,29 +27,22 @@ jobs:
         run: npm install --legacy-peer-deps
 
       - name: Build uni-app for App
-        id: build
-        run: |
-          echo "Starting build with npm run..."
-          npm run build:app-plus 2>&1 | tee build.log || echo "Build failed"
-          echo "Build exit code: $?"
-          echo "Build log:"
-          cat build.log
-        shell: bash
+        run: npm run build:app-plus
 
-      - name: Check build output
-        if: always()
+      - name: Verify build
         run: |
-          echo "=== Checking build output ==="
-          ls -la dist/build/ 2>/dev/null || echo "No dist/build"
-          ls -la dist/build/app/ 2>/dev/null || echo "No dist/build/app"
+          if [ ! -d "dist/build/app" ]; then
+            echo "ERROR: Build output directory not found!"
+            exit 1
+          fi
+          echo "Build output:"
+          ls -la dist/build/app/
+          echo "Build size:"
+          du -sh dist/build/app/
 
       - name: Upload build artifacts
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: txghzs-app-build
-          path: |
-            dist/build/app/
-            build.log
+          path: dist/build/app/
           retention-days: 7
-          if-no-files-found: ignore
