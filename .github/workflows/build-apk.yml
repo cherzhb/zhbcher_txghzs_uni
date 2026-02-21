@@ -8,6 +8,7 @@ on:
 env:
   APP_ID: __UNI__TXGHZS
   APP_NAME: 退休规划助手
+  DEBUG: 'uni:*'
 
 jobs:
   build:
@@ -22,19 +23,29 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          registry-url: 'https://registry.npmmirror.com'
 
       - name: Install dependencies
         run: |
-          npm config set registry https://registry.npmmirror.com
           npm install --legacy-peer-deps
 
+      - name: Debug - Check uni CLI
+        run: |
+          echo "=== Checking uni CLI ==="
+          npx uni --version || echo "uni CLI version check failed"
+          which node
+          node --version
+          npm --version
+
       - name: Build uni-app for App
-        run: npx uni build -p app-plus
+        run: |
+          echo "=== Starting build ==="
+          npx uni build -p app-plus --verbose 2>&1
+          echo "=== Build completed with exit code: $? ==="
 
       - name: Verify build output
         run: |
           echo "=== Build output verification ==="
+          ls -la dist/build/ || echo "No dist/build directory"
           if [ -d "dist/build/app" ]; then
             echo "✅ Build directory exists"
             ls -la dist/build/app/
@@ -50,7 +61,6 @@ jobs:
           cp -r dist/build/app/* output/
           
           echo "App ID: $APP_ID" > output/BUILD_INFO.txt
-          echo "App Name: $APP_NAME" >> output/BUILD_INFO.txt
           echo "Build Date: $(date)" >> output/BUILD_INFO.txt
           
           echo "=== Output files ==="
