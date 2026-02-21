@@ -33,15 +33,9 @@ jobs:
 
       - name: Install dependencies
         run: npm install --legacy-peer-deps
-        env:
-          NODE_ENV: development
 
       - name: Build uni-app for App
-        run: |
-          npx cross-env NODE_ENV=production UNI_PLATFORM=app-plus npx vite build
-        env:
-          UNI_INPUT_DIR: src
-          UNI_OUTPUT_DIR: dist/build/app-plus
+        run: npx uni build -p app-plus
 
       - name: Prepare app resources
         run: |
@@ -74,17 +68,13 @@ jobs:
         run: |
           cd /tmp
           wget -q "https://download1.dcloud.net.cn/download/HBuilderX.4.08.2025012107.linux.tar.gz" -O hbuilderx.tar.gz || true
-          tar -xzf hbuilderx.tar.gz 2>/dev/null || echo "HBuilderX download/extract failed"
-          ls -la /tmp/HBuilderX 2>/dev/null || echo "HBuilderX not available"
+          tar -xzf hbuilderx.tar.gz 2>/dev/null || echo "HBuilderX not available"
         continue-on-error: true
 
       - name: Try HBuilderX CLI pack
         run: |
           if [ -f "/tmp/HBuilderX/plugins/uniapp-cli/bin/uniapp-cli" ]; then
-            echo "Using HBuilderX CLI..."
             /tmp/HBuilderX/plugins/uniapp-cli/bin/uniapp-cli pack --platform APP-ANDROID --project . --timeout 600
-          else
-            echo "HBuilderX CLI not available"
           fi
         continue-on-error: true
 
@@ -98,7 +88,6 @@ jobs:
           App ID: $APP_ID
           App Name: $APP_NAME
           Build Date: $(date)
-          Build Runner: GitHub Actions
           
           打包说明：
           如果没有生成 APK 文件，请使用以下方式打包：
@@ -108,7 +97,6 @@ jobs:
           4. 或访问 https://dev.dcloud.net.cn/ 在线打包
           EOF
           
-          echo "=== 构建结果 ==="
           ls -la output/
 
       - name: Upload build artifacts
@@ -124,22 +112,7 @@ jobs:
           if ls output/*.apk 1> /dev/null 2>&1; then
             echo "apk_found=true" >> $GITHUB_OUTPUT
             echo "✅ APK 构建成功！"
-            ls -la output/*.apk
           else
             echo "apk_found=false" >> $GITHUB_OUTPUT
-            echo "⚠️ APK 未生成，需要使用 DCloud 云打包服务"
+            echo "⚠️ 需要使用 DCloud 云打包"
           fi
-
-      - name: Notify build status
-        if: always()
-        run: |
-          echo "=========================================="
-          echo "📱 构建完成"
-          echo "=========================================="
-          echo "App ID: $APP_ID"
-          if [ "${{ steps.check_apk.outputs.apk_found }}" == "true" ]; then
-            echo "✅ APK 已生成"
-          else
-            echo "⚠️ 需要手动打包：https://dev.dcloud.net.cn/"
-          fi
-          echo "=========================================="
