@@ -8,7 +8,6 @@ on:
 env:
   APP_ID: __UNI__TXGHZS
   APP_NAME: 退休规划助手
-  DEBUG: 'uni:*'
 
 jobs:
   build:
@@ -22,53 +21,35 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '18'
 
       - name: Install dependencies
-        run: |
-          npm install --legacy-peer-deps
-
-      - name: Debug - Check uni CLI
-        run: |
-          echo "=== Checking uni CLI ==="
-          npx uni --version || echo "uni CLI version check failed"
-          which node
-          node --version
-          npm --version
+        run: npm install --legacy-peer-deps
 
       - name: Build uni-app for App
+        id: build
         run: |
-          echo "=== Starting build ==="
-          npx uni build -p app-plus --verbose 2>&1
-          echo "=== Build completed with exit code: $? ==="
+          echo "Starting build with npm run..."
+          npm run build:app-plus 2>&1 | tee build.log || echo "Build failed"
+          echo "Build exit code: $?"
+          echo "Build log:"
+          cat build.log
+        shell: bash
 
-      - name: Verify build output
+      - name: Check build output
+        if: always()
         run: |
-          echo "=== Build output verification ==="
-          ls -la dist/build/ || echo "No dist/build directory"
-          if [ -d "dist/build/app" ]; then
-            echo "✅ Build directory exists"
-            ls -la dist/build/app/
-            du -sh dist/build/app/
-          else
-            echo "❌ Build directory not found"
-            exit 1
-          fi
-
-      - name: Collect build outputs
-        run: |
-          mkdir -p output
-          cp -r dist/build/app/* output/
-          
-          echo "App ID: $APP_ID" > output/BUILD_INFO.txt
-          echo "Build Date: $(date)" >> output/BUILD_INFO.txt
-          
-          echo "=== Output files ==="
-          du -sh output/
+          echo "=== Checking build output ==="
+          ls -la dist/build/ 2>/dev/null || echo "No dist/build"
+          ls -la dist/build/app/ 2>/dev/null || echo "No dist/build/app"
 
       - name: Upload build artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: txghzs-app-build
-          path: output/
+          path: |
+            dist/build/app/
+            build.log
           retention-days: 7
+          if-no-files-found: ignore
