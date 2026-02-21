@@ -29,22 +29,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '18'
-          registry-url: 'https://registry.npmmirror.com'
           cache: 'npm'
 
-      - name: Setup npm
-        run: |
-          npm install -g npm@latest
-          npm config set registry https://registry.npmmirror.com
-          npm config set strict-ssl false
-
-      - name: Clear npm cache
-        run: npm cache clean --force
-
       - name: Install dependencies
-        run: |
-          echo "Installing dependencies..."
-          npm install --legacy-peer-deps --no-audit --no-fund
+        run: npm install --legacy-peer-deps
         env:
           NODE_ENV: development
 
@@ -57,14 +45,12 @@ jobs:
 
       - name: Prepare app resources
         run: |
-          # 确保 manifest.json 在正确位置
           mkdir -p dist/build/app-plus
           cp src/manifest.json dist/build/app-plus/ 2>/dev/null || true
           
           echo "=== App 信息 ==="
           echo "App ID: $APP_ID"
           echo "App Name: $APP_NAME"
-          cat src/manifest.json | grep -E '"appid"|"versionName"|"versionCode"'
 
       - name: Create APK package info
         run: |
@@ -98,21 +84,16 @@ jobs:
             echo "Using HBuilderX CLI..."
             /tmp/HBuilderX/plugins/uniapp-cli/bin/uniapp-cli pack --platform APP-ANDROID --project . --timeout 600
           else
-            echo "HBuilderX CLI not available, using alternative method..."
+            echo "HBuilderX CLI not available"
           fi
         continue-on-error: true
 
       - name: Collect build outputs
         run: |
           mkdir -p output
-          
-          # 查找所有可能的 APK 文件
           find . -name "*.apk" -type f -exec cp {} output/ \; 2>/dev/null || true
-          
-          # 复制构建产物
           cp -r dist/build/app-plus/* output/ 2>/dev/null || true
           
-          # 创建构建信息
           cat > output/BUILD_INFO.txt << EOF
           App ID: $APP_ID
           App Name: $APP_NAME
@@ -156,13 +137,9 @@ jobs:
           echo "📱 构建完成"
           echo "=========================================="
           echo "App ID: $APP_ID"
-          echo ""
           if [ "${{ steps.check_apk.outputs.apk_found }}" == "true" ]; then
-            echo "✅ APK 已生成，请从 Actions artifacts 下载"
+            echo "✅ APK 已生成"
           else
-            echo "⚠️ 需要手动完成打包："
-            echo "1. 下载构建产物 (txghzs-app-build)"
-            echo "2. 使用 HBuilderX 或 DCloud 开发者中心打包"
-            echo "   https://dev.dcloud.net.cn/"
+            echo "⚠️ 需要手动打包：https://dev.dcloud.net.cn/"
           fi
           echo "=========================================="
