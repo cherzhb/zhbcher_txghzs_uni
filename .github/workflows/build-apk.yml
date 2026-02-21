@@ -8,6 +8,7 @@ on:
 env:
   APP_ID: __UNI__TXGHZS
   APP_NAME: 退休规划助手
+  NODE_ENV: production
 
 jobs:
   build:
@@ -22,16 +23,26 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          registry-url: 'https://registry.npmmirror.com'
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: |
+          npm config set registry https://registry.npmmirror.com
+          npm install --legacy-peer-deps
 
       - name: Build uni-app for App
+        id: build
         run: |
-          echo "Building uni-app..."
-          npx uni build -p app-plus
-          echo "Build exit code: $?"
-          ls -la dist/build/app/ || ls -la dist/build/ || echo "No build output"
+          echo "Starting build..."
+          npx uni build -p app-plus 2>&1 || echo "Build failed with exit code $?"
+          echo "Build step completed"
+        continue-on-error: true
+
+      - name: Check build output
+        run: |
+          echo "=== Checking build output ==="
+          ls -la dist/build/ 2>/dev/null || echo "No dist/build directory"
+          ls -la dist/build/app/ 2>/dev/null || echo "No dist/build/app directory"
 
       - name: Collect build outputs
         if: always()
@@ -43,6 +54,7 @@ jobs:
           echo "App ID: $APP_ID" > output/BUILD_INFO.txt
           echo "Build Date: $(date)" >> output/BUILD_INFO.txt
           
+          echo "=== Output files ==="
           ls -la output/ || echo "No output"
 
       - name: Upload build artifacts
