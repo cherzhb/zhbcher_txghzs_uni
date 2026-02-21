@@ -8,6 +8,7 @@ on:
 env:
   APP_ID: __UNI__TXGHZS
   APP_NAME: 退休规划助手
+  CI: true
 
 jobs:
   build:
@@ -24,15 +25,23 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: |
+          npm install --legacy-peer-deps
 
       - name: Build uni-app for App
-        run: npm run build:app-plus
+        id: build
+        run: |
+          echo "Starting build..."
+          npm run build:app-plus
+        env:
+          NODE_ENV: production
 
       - name: Verify build
         run: |
           if [ ! -d "dist/build/app" ]; then
             echo "ERROR: Build output directory not found!"
+            echo "Contents of dist/:"
+            ls -la dist/ 2>/dev/null || echo "No dist directory"
             exit 1
           fi
           echo "Build output:"
