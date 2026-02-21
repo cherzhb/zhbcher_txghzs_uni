@@ -28,10 +28,10 @@ jobs:
 
       - name: Build uni-app for App
         run: |
-          echo "Starting uni-app build..."
-          npm run build:app-plus
-          echo "Build completed"
-          ls -la dist/build/app/ || echo "Build output not found"
+          echo "Building uni-app..."
+          npx uni build -p app-plus
+          echo "Build exit code: $?"
+          ls -la dist/build/app/ || ls -la dist/build/ || echo "No build output"
 
       - name: Collect build outputs
         if: always()
@@ -41,10 +41,8 @@ jobs:
           cp -r dist/build/app/* output/ 2>/dev/null || echo "No app build files"
           
           echo "App ID: $APP_ID" > output/BUILD_INFO.txt
-          echo "App Name: $APP_NAME" >> output/BUILD_INFO.txt
           echo "Build Date: $(date)" >> output/BUILD_INFO.txt
           
-          echo "=== Output files ==="
           ls -la output/ || echo "No output"
 
       - name: Upload build artifacts
