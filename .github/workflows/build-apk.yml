@@ -1,0 +1,154 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      android_cert_alias:
+        description: 'Android certificate alias (optional)'
+        required: false
+      android_cert_password:
+        description: 'Android certificate password (optional)'
+        required: false
+
+env:
+  APP_ID: __UNI__TXGHZS
+  APP_NAME: 退休规划助手
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build uni-app for App
+      run: |
+        npx cross-env NODE_ENV=production UNI_PLATFORM=app-plus npx vite build
+      env:
+        UNI_INPUT_DIR: src
+        UNI_OUTPUT_DIR: dist/build/app-plus
+        
+    - name: Prepare app resources
+      run: |
+        # 确保 manifest.json 在正确位置
+        mkdir -p dist/build/app-plus
+        cp src/manifest.json dist/build/app-plus/ 2>/dev/null || true
+        
+        echo "=== App 信息 ==="
+        echo "App ID: $APP_ID"
+        echo "App Name: $APP_NAME"
+        cat src/manifest.json | grep -E '"appid"|"versionName"|"versionCode"'
+        
+    - name: Create APK package info
+      run: |
+        cat > dist/build/app-plus/package.json << 'PKGEOF'
+        {
+          "name": "txghzs-app",
+          "appid": "__UNI__TXGHZS",
+          "description": "退休规划助手",
+          "versionName": "1.0.0",
+          "versionCode": "100"
+        }
+        PKGEOF
+        
+    - name: Setup Java for Android SDK
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        
+    - name: Download HBuilderX (Linux)
+      run: |
+        cd /tmp
+        wget -q "https://download1.dcloud.net.cn/download/HBuilderX.4.08.2025012107.linux.tar.gz" -O hbuilderx.tar.gz || true
+        tar -xzf hbuilderx.tar.gz 2>/dev/null || echo "HBuilderX download/extract failed"
+        ls -la /tmp/HBuilderX 2>/dev/null || echo "HBuilderX not available"
+      continue-on-error: true
+        
+    - name: Try HBuilderX CLI pack
+      run: |
+        if [ -f "/tmp/HBuilderX/plugins/uniapp-cli/bin/uniapp-cli" ]; then
+          echo "Using HBuilderX CLI..."
+          /tmp/HBuilderX/plugins/uniapp-cli/bin/uniapp-cli pack --platform APP-ANDROID --project . --timeout 600
+        else
+          echo "HBuilderX CLI not available, using alternative method..."
+        fi
+      continue-on-error: true
+        
+    - name: Collect build outputs
+      run: |
+        mkdir -p output
+        
+        # 查找所有可能的 APK 文件
+        find . -name "*.apk" -type f -exec cp {} output/ \; 2>/dev/null || true
+        
+        # 复制构建产物
+        cp -r dist/build/app-plus/* output/ 2>/dev/null || true
+        
+        # 创建构建信息
+        cat > output/BUILD_INFO.txt << EOF
+        App ID: $APP_ID
+        App Name: $APP_NAME
+        Build Date: $(date)
+        Build Runner: GitHub Actions
+        
+        打包说明：
+        如果没有生成 APK 文件，请使用以下方式打包：
+        1. 下载 output 文件夹
+        2. 使用 HBuilderX 打开项目
+        3. 发行 -> 原生App-云打包
+        4. 或访问 https://dev.dcloud.net.cn/ 在线打包
+        EOF
+        
+        echo "=== 构建结果 ==="
+        ls -la output/
+        
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: txghzs-app-build
+        path: output/
+        retention-days: 7
+        
+    - name: Check for APK
+      id: check_apk
+      run: |
+        if ls output/*.apk 1> /dev/null 2>&1; then
+          echo "apk_found=true" >> $GITHUB_OUTPUT
+          echo "✅ APK 构建成功！"
+          ls -la output/*.apk
+        else
+          echo "apk_found=false" >> $GITHUB_OUTPUT
+          echo "⚠️ APK 未生成，需要使用 DCloud 云打包服务"
+        fi
+        
+    - name: Notify build status
+      if: always()
+      run: |
+        echo "=========================================="
+        echo "📱 构建完成"
+        echo "=========================================="
+        echo "App ID: $APP_ID"
+        echo ""
+        if [ "${{ steps.check_apk.outputs.apk_found }}" == "true" ]; then
+          echo "✅ APK 已生成，请从 Actions artifacts 下载"
+        else
+          echo "⚠️ 需要手动完成打包："
+          echo "1. 下载构建产物 (txghzs-app-build)"
+          echo "2. 使用 HBuilderX 或 DCloud 开发者中心打包"
+          echo "   https://dev.dcloud.net.cn/"
+        fi
+        echo "=========================================="
