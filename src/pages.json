@@ -1,0 +1,146 @@
+{
+"pages": [
+{
+"path": "pages/home/index",
+"style": {
+"navigationBarTitleText": "退休规划助手",
+"navigationBarBackgroundColor": "#0D1117",
+"navigationBarTextStyle": "white"
+}
+},
+{
+"path": "pages/login/index",
+"style": {
+"navigationBarTitleText": "登录",
+"navigationBarBackgroundColor": "#0D1117",
+"navigationBarTextStyle": "white"
+}
+},
+{
+"path": "pages/register/index",
+"style": {
+"navigationBarTitleText": "注册",
+"navigationBarBackgroundColor": "#0D1117",
+"navigationBarTextStyle": "white"
+}
+},
+{
+"path": "pages/calculator/index",
+"style": {
+"navigationBarTitleText": "退休工资测算",
+"navigationBarBackgroundColor": "#0D1117",
+"navigationBarTextStyle": "white"
+}
+},
+{
+"path": "pages/info/index",
+"style": {
+"navigationBarTitleText": "养老资讯",
+"navigationBarBackgroundColor": "#0D1117",
+"navigationBarTextStyle": "white"
+}
+},
+{
+"path": "pages/info-detail/index",
+"style": {
+"navigationBarTitleText": "资讯详情",
+"navigationBarBackgroundColor": "#0D1117",
+"navigationBarTextStyle": "white"
+}
+},
+{
+"path": "pages/profile/index",
+"style": {
+"navigationBarTitleText": "个人中心",
+"navigationBarBackgroundColor": "#0D1117",
+"navigationBarTextStyle": "white"
+}
+},
+{
+"path": "pages/user-profile/index",
+"style": {
+"navigationBarTitleText": "个人信息",
+"navigationBarBackgroundColor": "#0D1117",
+"navigationBarTextStyle": "white"
+}
+},
+{
+"path": "pages/admin-login/index",
+"style": {
+"navigationBarTitleText": "管理员登录",
+"navigationBarBackgroundColor": "#0D1117",
+"navigationBarTextStyle": "white"
+}
+},
+{
+"path": "pages/admin/index",
+"style": {
+"navigationBarTitleText": "管理后台",
+"navigationBarBackgroundColor": "#0D1117",
+"navigationBarTextStyle": "white"
+}
+},
+{
+"path": "pages/agreement/index",
+"style": {
+"navigationBarTitleText": "用户协议",
+"navigationBarBackgroundColor": "#0D1117",
+"navigationBarTextStyle": "white"
+}
+},
+{
+"path": "pages/privacy/index",
+"style": {
+"navigationBarTitleText": "隐私政策",
+"navigationBarBackgroundColor": "#0D1117",
+"navigationBarTextStyle": "white"
+}
+},
+{
+"path": "pages/reset-password/index",
+"style": {
+"navigationBarTitleText": "重置密码",
+"navigationBarBackgroundColor": "#0D1117",
+"navigationBarTextStyle": "white"
+}
+},
+{
+"path": "pages/version/index",
+"style": {
+"navigationBarTitleText": "版本管理",
+"navigationBarBackgroundColor": "#0D1117",
+"navigationBarTextStyle": "white"
+}
+}
+],
+"globalStyle": {
+"navigationBarTextStyle": "white",
+"navigationBarTitleText": "退休规划助手",
+"navigationBarBackgroundColor": "#0D1117",
+"backgroundColor": "#0D1117"
+},
+"tabBar": {
+"color": "#8B949E",
+"selectedColor": "#58A6FF",
+"borderStyle": "black",
+"backgroundColor": "#161B22",
+"list": [
+{
+"pagePath": "pages/home/index",
+"text": "首页"
+},
+{
+"pagePath": "pages/calculator/index",
+"text": "测算"
+},
+{
+"pagePath": "pages/info/index",
+"text": "资讯"
+},
+{
+"pagePath": "pages/profile/index",
+"text": "我的"
+}
+]
+}
+}
