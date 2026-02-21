@@ -39,24 +39,11 @@ jobs:
 
       - name: Prepare app resources
         run: |
-          mkdir -p dist/build/app-plus
-          cp src/manifest.json dist/build/app-plus/ 2>/dev/null || true
-          
           echo "=== App 信息 ==="
           echo "App ID: $APP_ID"
           echo "App Name: $APP_NAME"
-
-      - name: Create APK package info
-        run: |
-          cat > dist/build/app-plus/package.json << 'PKGEOF'
-          {
-            "name": "txghzs-app",
-            "appid": "__UNI__TXGHZS",
-            "description": "退休规划助手",
-            "versionName": "1.0.0",
-            "versionCode": "100"
-          }
-          PKGEOF
+          echo "=== 构建产物 ==="
+          ls -la dist/build/app/
 
       - name: Setup Java for Android SDK
         uses: actions/setup-java@v4
@@ -81,9 +68,14 @@ jobs:
       - name: Collect build outputs
         run: |
           mkdir -p output
-          find . -name "*.apk" -type f -exec cp {} output/ \; 2>/dev/null || true
-          cp -r dist/build/app-plus/* output/ 2>/dev/null || true
           
+          # 查找 APK 文件
+          find . -name "*.apk" -type f -exec cp {} output/ \; 2>/dev/null || true
+          
+          # 复制构建产物 (正确路径是 dist/build/app/)
+          cp -r dist/build/app/* output/ 2>/dev/null || true
+          
+          # 创建构建信息
           cat > output/BUILD_INFO.txt << EOF
           App ID: $APP_ID
           App Name: $APP_NAME
