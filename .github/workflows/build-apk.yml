@@ -4,13 +4,6 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
-    inputs:
-      android_cert_alias:
-        description: 'Android certificate alias (optional)'
-        required: false
-      android_cert_password:
-        description: 'Android certificate password (optional)'
-        required: false
 
 env:
   APP_ID: __UNI__TXGHZS
@@ -28,61 +21,58 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
-          cache: 'npm'
+          node-version: '20'
+
+      - name: Check Node and npm versions
+        run: |
+          node --version
+          npm --version
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps
+        run: |
+          npm install --legacy-peer-deps --loglevel=error
+        env:
+          NODE_ENV: development
+
+      - name: List installed packages
+        run: npm list --depth=0
 
       - name: Build uni-app for App
-        run: npm run build:app-plus
-
-      - name: Prepare app resources
+        id: build
         run: |
-          echo "=== App 信息 ==="
-          echo "App ID: $APP_ID"
-          echo "App Name: $APP_NAME"
-          echo "=== 构建产物 ==="
-          ls -la dist/build/app/
+          echo "Starting build..."
+          npm run build:app-plus 2>&1 | tee build.log
+          echo "Build exit code: $?"
+        continue-on-error: true
+
+      - name: Check build output
+        run: |
+          echo "=== Build log ==="
+          cat build.log 2>/dev/null || echo "No build log"
+          echo "=== Build directory ==="
+          ls -la dist/build/ 2>/dev/null || echo "No dist/build directory"
+          ls -la dist/build/app/ 2>/dev/null || echo "No dist/build/app directory"
 
       - name: Setup Java for Android SDK
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
-
-      - name: Download HBuilderX (Linux)
-        run: |
-          cd /tmp
-          wget -q "https://download1.dcloud.net.cn/download/HBuilderX.4.08.2025012107.linux.tar.gz" -O hbuilderx.tar.gz || true
-          tar -xzf hbuilderx.tar.gz 2>/dev/null || echo "HBuilderX not available"
-        continue-on-error: true
-
-      - name: Try HBuilderX CLI pack
-        run: |
-          if [ -f "/tmp/HBuilderX/plugins/uniapp-cli/bin/uniapp-cli" ]; then
-            /tmp/HBuilderX/plugins/uniapp-cli/bin/uniapp-cli pack --platform APP-ANDROID --project . --timeout 600
-          fi
-        continue-on-error: true
+        if: success()
 
       - name: Collect build outputs
+        if: always()
         run: |
           mkdir -p output
-          
-          # 查找 APK 文件
           find . -name "*.apk" -type f -exec cp {} output/ \; 2>/dev/null || true
-          
-          # 复制构建产物 (正确路径是 dist/build/app/)
           cp -r dist/build/app/* output/ 2>/dev/null || true
           
-          # 创建构建信息
           cat > output/BUILD_INFO.txt << EOF
           App ID: $APP_ID
           App Name: $APP_NAME
           Build Date: $(date)
           
           打包说明：
-          如果没有生成 APK 文件，请使用以下方式打包：
           1. 下载 output 文件夹
           2. 使用 HBuilderX 打开项目
           3. 发行 -> 原生App-云打包
@@ -92,19 +82,9 @@ jobs:
           ls -la output/
 
       - name: Upload build artifacts
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: txghzs-app-build
           path: output/
           retention-days: 7
-
-      - name: Check for APK
-        id: check_apk
-        run: |
-          if ls output/*.apk 1> /dev/null 2>&1; then
-            echo "apk_found=true" >> $GITHUB_OUTPUT
-            echo "✅ APK 构建成功！"
-          else
-            echo "apk_found=false" >> $GITHUB_OUTPUT
-            echo "⚠️ 需要使用 DCloud 云打包"
-          fi
