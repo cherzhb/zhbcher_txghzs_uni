@@ -1,5 +1,4 @@
 name: Build Android APK
-
 on:
   push:
     branches: [ main ]
@@ -13,7 +12,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -24,33 +22,20 @@ jobs:
           node-version: '18'
 
       - name: Install dependencies
-        run: npm install --legacy-peer-deps 2>&1 | tee install.log
+        run: npm install --legacy-peer-deps
 
       - name: Build uni-app for App
-        id: build
-        run: |
-          echo "=== Starting build ===" 
-          npm run build:app-plus 2>&1 | tee build.log || true
-          echo "=== Build completed ==="
-        shell: bash
+        run: npx uni build -p app
 
-      - name: Check build result
+      - name: Package App resources
         run: |
-          echo "=== Build log tail ==="
-          tail -50 build.log 2>/dev/null || echo "No build log"
-          echo "=== dist/ contents ==="
-          ls -la dist/ 2>/dev/null || echo "No dist directory"
-          ls -la dist/build/ 2>/dev/null || echo "No dist/build"
-          ls -la dist/build/app/ 2>/dev/null || echo "No dist/build/app"
+          cd dist/build
+          zip -r txghzs-app.zip app/
+          echo "Package size: $(ls -lh txghzs-app.zip)"
 
-      - name: Upload logs and output
-        if: always()
+      - name: Upload App package
         uses: actions/upload-artifact@v4
         with:
-          name: build-output
-          path: |
-            build.log
-            install.log
-            dist/build/app/
+          name: txghzs-app
+          path: dist/build/txghzs-app.zip
           retention-days: 7
-          if-no-files-found: ignore
