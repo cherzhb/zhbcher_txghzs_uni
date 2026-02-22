@@ -1,0 +1,125 @@
+name: Build Android APK (Simple)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: '版本号 (如: 1.0.1)'
+        required: false
+        default: '1.0.3'
+
+env:
+  APP_ID: uni.TXGHZS
+  APP_NAME: 退休规划助手
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      
+    - name: Install dependencies
+      run: |
+        npm install --legacy-peer-deps || npm install --force
+      continue-on-error: false
+        
+    - name: Build uni-app for H5
+      run: |
+        npm run build:h5
+      env:
+        NODE_ENV: production
+        
+    - name: Create Android Project with Cordova
+      run: |
+        # 使用 Cordova 替代 Capacitor - 更简单可靠
+        npm install -g cordova
+        cordova create android-retirement com.retirement.txghzs "退休规划助手"
+        cd android-retirement
+        cordova platform add android@latest
+        
+    - name: Copy H5 assets to Android
+      run: |
+        # 复制构建产物
+        cp -r dist/build/h5/* android-retirement/www/
+        
+    - name: Build APK with Cordova
+      run: |
+        cd android-retirement
+        cordova build android --debug
+      continue-on-error: true
+      
+    - name: Copy APK outputs
+      run: |
+        mkdir -p output
+        
+        # 查找并复制 APK 文件
+        find android-retirement -name "*.apk" -type f -exec cp {} output/ \; 2>/dev/null || true
+        
+        # 重命名 APK
+        if ls output/*.apk 1> /dev/null 2>&1; then
+          mv output/*.apk output/退休规划助手-${{ github.event.inputs.version_name || '1.0.3' }}-debug.apk
+          echo "✅ APK 已生成"
+        else
+          echo "⚠️ APK 未生成"
+        fi
+        
+    - name: Create build info
+      run: |
+        cat > output/BUILD_INFO.txt << EOF
+        App ID: $APP_ID
+        App Name: $APP_NAME
+        Version: ${{ github.event.inputs.version_name || '1.0.3' }}
+        Build Date: $(date)
+        Build Run: #${{ github.run_number }}
+        Commit: ${{ github.sha }}
+        
+        构建状态检查：
+        EOF
+        
+        if ls output/*.apk 1> /dev/null 2>&1; then
+          echo "✅ APK 构建成功" >> output/BUILD_INFO.txt
+          ls -lh output/*.apk >> output/BUILD_INFO.txt
+        else
+          echo "❌ APK 构建失败" >> output/BUILD_INFO.txt
+          echo "请检查构建日志获取详细错误信息" >> output/BUILD_INFO.txt
+        fi
+        
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: txghzs-apk-${{ github.event.inputs.version_name || '1.0.3' }}
+        path: output/
+        retention-days: 30
+        
+    - name: Check results
+      if: always()
+      run: |
+        echo "=== 构建结果 ==="
+        if ls output/*.apk 1> /dev/null 2>&1; then
+          echo "✅ APK 已生成！"
+          ls -lh output/*.apk
+        else
+          echo "⚠️ APK 未生成"
+        fi
+        echo ""
+        echo "请从 Actions artifacts 下载构建产物"
