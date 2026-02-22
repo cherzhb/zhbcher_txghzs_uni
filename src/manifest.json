@@ -20,7 +20,13 @@
       "android": {
         "permissions": [
           "<uses-permission android:name=\"android.permission.INTERNET\"/>"
-        ]
+        ],
+        "icon": {
+          "hdpi": "static/icon.png",
+          "xhdpi": "static/icon.png",
+          "xxhdpi": "static/icon.png",
+          "xxxhdpi": "static/icon.png"
+        }
       },
       "ios": {},
       "sdkConfigs": {}
