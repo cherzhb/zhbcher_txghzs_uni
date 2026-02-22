@@ -1,0 +1,253 @@
+name: Build Android APK with Capacitor
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      version_name:
+        description: '版本号 (如: 1.0.1)'
+        required: false
+        default: '1.0.0'
+      release_notes:
+        description: '发布说明'
+        required: false
+
+env:
+  APP_ID: uni.TXGHZS
+  APP_NAME: 退休规划助手
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+        
+    - name: Setup Java
+      uses: actions/setup-java@v4
+      with:
+        distribution: 'temurin'
+        java-version: '17'
+        
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+      
+    - name: Install dependencies
+      run: |
+        npm install --legacy-peer-deps
+        
+    - name: Install Capacitor
+      run: |
+        npm install -D @capacitor/core @capacitor/cli @capacitor/android
+        npx cap sync
+        
+    - name: Build uni-app for H5
+      run: |
+        # 先构建 H5 版本，这是 Capacitor 需要的资源
+        npm run build:h5
+      env:
+        NODE_ENV: production
+        
+    - name: Initialize Capacitor
+      run: |
+        # 初始化 Capacitor 项目
+        npx cap init "退休规划助手" "${{ env.APP_ID }}" --web-dir=dist/build/h5
+      env:
+        CAPACITOR_GRAPH_CLIENT_TOKEN: ${{ secrets.CAPACITOR_TOKEN }}
+        
+    - name: Add Android platform
+      run: |
+        # 添加 Android 平台
+        npx cap add android
+        
+        # 同步 Web 资源到 Android 项目
+        npx cap sync android
+        
+    - name: Setup Gradle
+      uses: gradle/gradle-build-action@v3
+      
+    - name: Update Android manifest and build configs
+      run: |
+        # 更新 AndroidManifest.xml 权限
+        mkdir -p android/app/src/main
+        cat > android/app/src/main/AndroidManifest.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <manifest xmlns:android="http://schemas.android.com/apk/res/android"
+            android:versionCode="100"
+            android:versionName="1.0.0">
+            
+            <uses-permission android:name="android.permission.INTERNET" />
+            <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+            
+            <application
+                android:allowBackup="true"
+                android:icon="@mipmap/ic_launcher"
+                android:label="退休规划助手"
+                android:theme="@style/AppTheme">
+                
+                <activity
+                    android:name="io.ionic.starter.MainActivity"
+                    android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode"
+                    android:label="@string/app_name"
+                    android:theme="@style/AppTheme"
+                    android:exported="true">
+                    
+                    <intent-filter>
+                        <action android:name="android.intent.action.MAIN" />
+                        <category android:name="android.intent.category.LAUNCHER" />
+                    </intent-filter>
+                </activity>
+            </application>
+        </manifest>
+        EOF
+        
+        # 更新 strings.xml
+        mkdir -p android/app/src/main/res/values
+        cat > android/app/src/main/res/values/strings.xml << 'EOF'
+        <?xml version="1.0" encoding="utf-8"?>
+        <resources>
+            <string name="app_name">退休规划助手</string>
+            <string name="title_activity_main">退休规划助手</string>
+        </resources>
+        EOF
+        
+    - name: Set version from input
+      run: |
+        VERSION="${{ github.event.inputs.version_name }}"
+        if [ -z "$VERSION" ]; then
+          VERSION="1.0.0"
+        fi
+        echo "APP_VERSION=$VERSION" >> $GITHUB_ENV
+        
+        # 更新 version in build.gradle
+        sed -i "s/versionName .*/versionName \"$VERSION\"/" android/app/build.gradle
+        sed -i "s/versionCode .*/versionCode ${GITHUB_RUN_NUMBER}/" android/app/build.gradle
+        
+    - name: Build Debug APK
+      run: |
+        cd android
+        chmod +x gradlew
+        ./gradlew assembleDebug --stacktrace
+      continue-on-error: true
+      
+    - name: Build Release APK (if debug fails)
+      if: failure()
+      run: |
+        cd android
+        ./gradlew assembleRelease --stacktrace || true
+        
+    - name: Prepare output
+      run: |
+        mkdir -p output
+        
+        # 查找并复制 APK 文件
+        if [ -f "android/app/build/outputs/apk/debug/app-debug.apk" ]; then
+          cp android/app/build/outputs/apk/debug/app-debug.apk output/退休规划助手-${{ env.APP_VERSION }}-debug.apk
+          echo "✅ Debug APK 构建成功"
+          APK_SIZE=$(stat -f%z "output/退休规划助手-${{ env.APP_VERSION }}-debug.apk" 2>/dev/null || stat -c%s "output/退休规划助手-${{ env.APP_VERSION }}-debug.apk" 2>/dev/null)
+          echo "APK Size: $(echo "$APK_SIZE / 1024 / 1024" | bc) MB"
+        fi
+        
+        if [ -f "android/app/build/outputs/apk/release/app-release-unsigned.apk" ]; then
+          cp android/app/build/outputs/apk/release/app-release-unsigned.apk output/退休规划助手-${{ env.APP_VERSION }}-release-unsigned.apk
+          echo "✅ Release APK 构建成功（未签名）"
+        fi
+        
+        # 创建构建信息
+        cat > output/BUILD_INFO.md << EOF
+        # 退休规划助手 APK 构建报告
+        
+        ## 构建信息
+        - **版本**: ${{ env.APP_VERSION }}
+        - **构建时间**: $(date)
+        - **Commit**: ${{ github.sha }}
+        - **Actions Run**: #${{ github.run_number }}
+        
+        ## 构建产物
+        
+        EOF
+        
+        if [ -f "output/退休规划助手-${{ env.APP_VERSION }}-debug.apk" ]; then
+          echo "### ✅ APK 文件" >> output/BUILD_INFO.md
+          echo "- 文件名: 退休规划助手-${{ env.APP_VERSION }}-debug.apk" >> output/BUILD_INFO.md
+          echo "- 类型: Debug（可以安装，用于测试）" >> output/BUILD_INFO.md
+          echo "" >> output/BUILD_INFO.md
+        fi
+        
+        cat >> output/BUILD_INFO.md << EOF
+        ## 安装说明
+        
+        1. 下载 APK 文件
+        2. 在 Android 设备上启用"未知来源"安装
+        3. 点击 APK 文件安装
+        
+        ## 构建方式
+        
+        本 APK 使用以下流程构建：
+        1. GitHub Actions 触发构建
+        2. uni-app 构建 H5 版本
+        3. Capacitor 将 H5 资源包装为原生应用
+        4. Android Gradle 编译生成 APK
+        
+        优点：
+        - ✅ 完全云端操作，无需本地环境
+        - ✅ 自动化构建，推送到 main 分支即触发
+        - ✅ 无需付费的 DCloud 云打包服务
+        - ✅ 构建产物直接从 GitHub Actions 下载
+        
+        注意：
+        - 这是一个 H5 包装的原生应用，性能可能略低于原生包
+        - 如需优化可以考虑使用离线包或其他技术
+        EOF
+        
+        echo "=== 输出文件列表 ==="
+        ls -lh output/
+        
+    - name: Upload APK artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: txghzs-apk-v${{ env.APP_VERSION }}
+        path: output/*.apk
+        retention-days: 90
+        
+    - name: Upload build info
+      uses: actions/upload-artifact@v4
+      with:
+        name: txghzs-build-info-v${{ env.APP_VERSION }}
+        path: output/BUILD_INFO.md
+        retention-days: 90
+        
+    - name: Create Build Summary
+      if: always()
+      run: |
+        echo "## 🔨 构建完成
+        " >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "| 项目 | 信息 |" >> $GITHUB_STEP_SUMMARY
+        echo "|------|------|" >> $GITHUB_STEP_SUMMARY
+        echo "| App 名称 | 退休规划助手 |" >> $GITHUB_STEP_SUMMARY
+        echo "| 版本 | ${{ env.APP_VERSION }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| 构建 # | ${{ github.run_number }} |" >> $GITHUB_STEP_SUMMARY
+        echo "| Commit | ${{ github.sha }} |" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        
+        if [ -f "output/退休规划助手-${{ env.APP_VERSION }}-debug.apk" ]; then
+          echo "### ✅ APK 已生成" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "请从 Actions artifacts 下载：" >> $GITHUB_STEP_SUMMARY
+          echo "- \`txghzs-apk-v${{ env.APP_VERSION }}\` - APK 文件" >> $GITHUB_STEP_SUMMARY
+          echo "- \`txghzs-build-info-v${{ env.APP_VERSION }}\` - 构建详情" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "### ⚠️ APK 生成失败" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "请查看构建日志排查问题" >> $GITHUB_STEP_SUMMARY
+        fi

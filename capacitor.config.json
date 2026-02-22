@@ -1,0 +1,17 @@
+{
+  "appId": "uni.TXGHZS",
+  "appName": "退休规划助手",
+  "webDir": "dist/build/h5",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "buildOptions": {
+      "keystorePath": "",
+      "keystoreAlias": "",
+      "keystorePassword": ""
+    },
+    "webContentsDebuggingEnabled": true
+  }
+}
