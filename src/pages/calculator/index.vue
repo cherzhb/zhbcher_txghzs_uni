@@ -15,6 +15,13 @@
 </view>
 </view>
 
+<!-- 加载中 -->
+<view class="loading-section" v-else-if="isLoading">
+<view class="glass-card loading-card">
+<text class="loading-text">正在加载数据...</text>
+</view>
+</view>
+
 <!-- 已登录：显示结果和参数 -->
 <template v-else>
 <!-- Result Card - 预计每月可领取 -->
@@ -27,7 +34,6 @@
 <text class="number">{{ formatMoney(pensionResult.totalPension) }}</text>
 </view>
 </view>
-
 <!-- 养老金构成 -->
 <view class="pension-breakdown">
 <view class="breakdown-boxes">
@@ -40,7 +46,6 @@
 <text class="box-value">¥{{ formatMoney(pensionResult.personalPension) }}</text>
 </view>
 </view>
-
 <view class="progress-bar-wrap">
 <view class="progress-bar">
 <view class="progress-basic" :style="{ width: pensionResult.basicPensionPercent + '%' }"></view>
@@ -67,8 +72,7 @@
 <text class="arrow">›</text>
 </view>
 </view>
-
-<view class="param-item" @click="openDatePicker">
+<view class="param-item">
 <text class="param-label">出生日期</text>
 <picker mode="date" :value="birthDate" start="1940-01-01" :end="today" @change="onDateChange">
 <view class="param-value-wrap">
@@ -77,7 +81,6 @@
 </view>
 </picker>
 </view>
-
 <view class="param-item" @click="openLocationPicker">
 <text class="param-label">参保地</text>
 <view class="param-value-wrap">
@@ -85,7 +88,6 @@
 <text class="arrow">›</text>
 </view>
 </view>
-
 <view class="param-item" @click="openYearsPicker">
 <text class="param-label">缴费年限</text>
 <view class="param-value-wrap">
@@ -93,7 +95,6 @@
 <text class="arrow">›</text>
 </view>
 </view>
-
 <view class="param-item" @click="openSalaryPicker">
 <text class="param-label">月工资</text>
 <view class="param-value-wrap">
@@ -101,7 +102,6 @@
 <text class="arrow">›</text>
 </view>
 </view>
-
 <view class="param-item" @click="openBalancePicker">
 <text class="param-label">账户余额</text>
 <view class="param-value-wrap">
@@ -109,7 +109,6 @@
 <text class="arrow">›</text>
 </view>
 </view>
-
 <view class="param-item" @click="openIndexPicker">
 <text class="param-label">缴费指数</text>
 <view class="param-value-wrap">
@@ -145,10 +144,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import dayjs from 'dayjs'
 
 // 登录状态
 const isLoggedIn = ref(false)
+const isLoading = ref(false)
 
 // 地区平均工资数据
 const locationSalaries = {
@@ -174,13 +173,18 @@ const contributionIndex = ref(1.0)
 const locationCode = ref('110000')
 const jobType = ref(1)
 
-// 今天的日期
-const today = dayjs().format('YYYY-MM-DD')
+// 今天的日期（不用dayjs，直接计算）
+const today = computed(() => {
+const d = new Date()
+return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+})
 
 // 测算年龄
 const age = computed(() => {
 if (!birthDate.value) return 30
-return dayjs().diff(dayjs(birthDate.value), 'year')
+const birth = new Date(birthDate.value)
+const now = new Date()
+return Math.floor((now - birth) / (365.25 * 24 * 60 * 60 * 1000))
 })
 
 // 测算退休年龄和月份
@@ -218,7 +222,6 @@ const futureAvgSalary = currentAvgSalary * Math.pow(1 + salaryGrowthRate, yearsT
 
 // 总缴费年限 = 已缴费年限 + 距退休年数
 const totalContributionYears = contributionYears.value + yearsToRetireVal
-
 const index = contributionIndex.value
 
 // 每月存入个人账户金额（工资的8%）
@@ -227,16 +230,16 @@ const monthlyDeposit = salary.value * 0.08
 // 剩余月数
 const monthsRemaining = yearsToRetireVal * 12
 
-// 预测退休时个人账户余额（现有余额 + 未来存入 + 利息）
+// 预测退休时个人账户余额
 const futureAccountBalance = accountBalance.value + monthlyDeposit * monthsRemaining * (1 + 0.03 / 12 * monthsRemaining / 2)
 
 // 计发月数
 const months = retirementInfo.value.months
 
-// 基础养老金 = 退休时社平工资 × (1 + 缴费指数) / 2 × 缴费年限 × 1%
+// 基础养老金
 const basicPension = futureAvgSalary * (1 + index) / 2 * totalContributionYears * 0.01
 
-// 个人账户养老金 = 账户余额 ÷ 计发月数
+// 个人账户养老金
 const personalPension = futureAccountBalance / months
 
 // 总养老金
@@ -252,7 +255,7 @@ basicPensionPercent: totalPension > 0 ? Math.round((basicPension / totalPension)
 
 // 格式化金额
 const formatMoney = (num) => {
-return new Intl.NumberFormat('zh-CN').format(Math.round(num))
+return Math.round(num).toLocaleString('zh-CN')
 }
 
 // 性别显示
@@ -266,6 +269,7 @@ isLoggedIn.value = false
 return
 }
 
+isLoading.value = true
 isLoggedIn.value = true
 
 try {
@@ -290,6 +294,9 @@ jobType.value = res.data.job_type || 1
 }
 } catch (err) {
 console.error('加载档案失败:', err)
+// 加载失败也显示默认数据
+} finally {
+isLoading.value = false
 }
 }
 
@@ -301,10 +308,6 @@ success: (res) => {
 gender.value = res.tapIndex === 0 ? 1 : 2
 }
 })
-}
-
-const openDatePicker = () => {
-// 由 picker 组件处理
 }
 
 const onDateChange = (e) => {
@@ -452,6 +455,21 @@ font-size: 32rpx;
 font-weight: 600;
 color: #FFFFFF;
 border: none;
+}
+
+/* Loading */
+.loading-section {
+margin-bottom: 32rpx;
+}
+
+.loading-card {
+text-align: center;
+padding: 64rpx 32rpx;
+}
+
+.loading-text {
+color: #8B949E;
+font-size: 28rpx;
 }
 
 /* Result Section */
