@@ -136,44 +136,28 @@ return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String
 // 计算退休日期
 const retirementDate = computed(() => {
 if (!birthDate.value) return ''
-try {
-const birth = new Date(birthDate.value)
-const retireYear = birth.getFullYear() + retirementAge.value
-const month = String(birth.getMonth() + 1).padStart(2, '0')
-const day = String(birth.getDate()).padStart(2, '0')
+const [year, month, day] = birthDate.value.split('-')
+const retireYear = parseInt(year) + retirementAge.value
 return `${retireYear}年${month}月${day}日`
-} catch (e) {
-return ''
-}
 })
 
 // 计算退役日期的星期
 const retirementWeekday = computed(() => {
 if (!birthDate.value) return ''
-try {
-const birth = new Date(birthDate.value)
-const retireDate = new Date(birthDate.value)
-retireDate.setFullYear(birth.getFullYear() + retirementAge.value)
+const [year, month, day] = birthDate.value.split('-')
+const retireDate = new Date(parseInt(year) + retirementAge.value, parseInt(month) - 1, parseInt(day))
 const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 return weekdays[retireDate.getDay()] || ''
-} catch (e) {
-return ''
-}
 })
 
 // 计算距离退休天数
 const daysUntilRetirement = computed(() => {
 if (!birthDate.value) return null
-try {
-const birth = new Date(birthDate.value)
-const retireDate = new Date(birthDate.value)
-retireDate.setFullYear(birth.getFullYear() + retirementAge.value)
+const [year, month, day] = birthDate.value.split('-')
+const retireDate = new Date(parseInt(year) + retirementAge.value, parseInt(month) - 1, parseInt(day))
 const today = new Date()
 const diff = Math.ceil((retireDate - today) / (1000 * 60 * 60 * 24))
 return diff > 0 ? diff : 0
-} catch (e) {
-return null
-}
 })
 
 // 性别显示
@@ -182,8 +166,8 @@ const genderText = computed(() => gender.value === 1 ? '男' : '女')
 // 计算年龄
 const currentAge = computed(() => {
 if (!birthDate.value) return ''
-try {
-const birth = new Date(birthDate.value)
+const [year, month, day] = birthDate.value.split('-')
+const birth = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
 const today = new Date()
 let age = today.getFullYear() - birth.getFullYear()
 const monthDiff = today.getMonth() - birth.getMonth()
@@ -191,25 +175,18 @@ if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
 age--
 }
 return age
-} catch (e) {
-return ''
-}
 })
 
 // 进度百分比
 const progressPercent = computed(() => {
 if (!birthDate.value) return 0
-try {
-const birth = new Date(birthDate.value)
-const retireDate = new Date(birthDate.value)
-retireDate.setFullYear(birth.getFullYear() + retirementAge.value)
+const [year, month, day] = birthDate.value.split('-')
+const birth = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+const retire = new Date(parseInt(year) + retirementAge.value, parseInt(month) - 1, parseInt(day))
 const today = new Date()
-const totalDays = (retireDate - birth) / (1000 * 60 * 60 * 24)
+const totalDays = (retire - birth) / (1000 * 60 * 60 * 24)
 const passedDays = (today - birth) / (1000 * 60 * 60 * 24)
 return Math.round(Math.min(Math.max(passedDays / totalDays, 0), 1) * 100)
-} catch (e) {
-return 0
-}
 })
 
 // 加载用户数据
