@@ -108,7 +108,6 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { onShow } from '@dcloudio/uni-app'
-import dayjs from 'dayjs'
 
 // 登录状态
 const isLoggedIn = ref(false)
@@ -129,31 +128,52 @@ const ageOptions = Array.from({ length: 21 }, (_, i) => (50 + i) + '岁')
 
 // 日期选择器范围
 const startDate = '1940-01-01'
-const endDate = dayjs().format('YYYY-MM-DD')
+const endDate = computed(() => {
+const d = new Date()
+return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+})
 
 // 计算退休日期
 const retirementDate = computed(() => {
 if (!birthDate.value) return ''
-const birth = dayjs(birthDate.value)
-return birth.add(retirementAge.value, 'year').format('YYYY年MM月DD日')
+try {
+const birth = new Date(birthDate.value)
+const retireYear = birth.getFullYear() + retirementAge.value
+const month = String(birth.getMonth() + 1).padStart(2, '0')
+const day = String(birth.getDate()).padStart(2, '0')
+return `${retireYear}年${month}月${day}日`
+} catch (e) {
+return ''
+}
 })
 
 // 计算退役日期的星期
 const retirementWeekday = computed(() => {
 if (!birthDate.value) return ''
-const birth = dayjs(birthDate.value)
-const retireDate = birth.add(retirementAge.value, 'year')
+try {
+const birth = new Date(birthDate.value)
+const retireDate = new Date(birthDate.value)
+retireDate.setFullYear(birth.getFullYear() + retirementAge.value)
 const weekdays = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
-return weekdays[retireDate.day()] || ''
+return weekdays[retireDate.getDay()] || ''
+} catch (e) {
+return ''
+}
 })
 
 // 计算距离退休天数
 const daysUntilRetirement = computed(() => {
 if (!birthDate.value) return null
-const retireDate = dayjs(birthDate.value).add(retirementAge.value, 'year')
-const today = dayjs()
-const diff = retireDate.diff(today, 'day')
+try {
+const birth = new Date(birthDate.value)
+const retireDate = new Date(birthDate.value)
+retireDate.setFullYear(birth.getFullYear() + retirementAge.value)
+const today = new Date()
+const diff = Math.ceil((retireDate - today) / (1000 * 60 * 60 * 24))
 return diff > 0 ? diff : 0
+} catch (e) {
+return null
+}
 })
 
 // 性别显示
@@ -162,20 +182,34 @@ const genderText = computed(() => gender.value === 1 ? '男' : '女')
 // 计算年龄
 const currentAge = computed(() => {
 if (!birthDate.value) return ''
-const birth = dayjs(birthDate.value)
-const today = dayjs()
-return today.diff(birth, 'year')
+try {
+const birth = new Date(birthDate.value)
+const today = new Date()
+let age = today.getFullYear() - birth.getFullYear()
+const monthDiff = today.getMonth() - birth.getMonth()
+if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+age--
+}
+return age
+} catch (e) {
+return ''
+}
 })
 
 // 进度百分比
 const progressPercent = computed(() => {
 if (!birthDate.value) return 0
-const birth = dayjs(birthDate.value)
-const retire = birth.add(retirementAge.value, 'year')
-const today = dayjs()
-const totalDays = retire.diff(birth, 'day')
-const passedDays = today.diff(birth, 'day')
-return Math.round(Math.min((passedDays / totalDays), 1) * 100)
+try {
+const birth = new Date(birthDate.value)
+const retireDate = new Date(birthDate.value)
+retireDate.setFullYear(birth.getFullYear() + retirementAge.value)
+const today = new Date()
+const totalDays = (retireDate - birth) / (1000 * 60 * 60 * 24)
+const passedDays = (today - birth) / (1000 * 60 * 60 * 24)
+return Math.round(Math.min(Math.max(passedDays / totalDays, 0), 1) * 100)
+} catch (e) {
+return 0
+}
 })
 
 // 加载用户数据
@@ -196,7 +230,6 @@ header: {
 })
 
 if (res.statusCode === 200 && res.data) {
-// 重置为服务器数据（每次返回页面都重新加载）
 if (res.data.gender !== null && res.data.gender !== undefined) {
 gender.value = res.data.gender
 }
@@ -205,11 +238,10 @@ birthDate.value = res.data.birth_date
 }
 // 根据性别设置默认退休年龄
 if (res.data.gender === 2) {
-retirementAge.value = 55 // 女性默认55岁
+retirementAge.value = 55
 } else {
-retirementAge.value = 60 // 男性默认60岁
+retirementAge.value = 60
 }
-console.log('用户数据加载成功:', res.data)
 }
 } catch (error) {
 console.error('加载用户数据失败:', error)
@@ -222,7 +254,6 @@ uni.showActionSheet({
 itemList: ['男', '女'],
 success: (res) => {
 gender.value = res.tapIndex === 0 ? 1 : 2
-// 根据性别自动调整退休年龄
 retirementAge.value = gender.value === 1 ? 60 : 55
 }
 })
@@ -243,7 +274,7 @@ retirementAge.value = 50 + res.tapIndex
 })
 }
 
-// 页面显示时加载数据（每次返回都会触发）
+// 页面显示时加载数据
 onShow(() => {
 loadUserData()
 })
@@ -266,18 +297,22 @@ min-height: 100vh;
 padding: 56rpx 48rpx 200rpx;
 background: linear-gradient(180deg, #0D1117 0%, #161B22 100%);
 }
+
 .header-section {
 margin-bottom: 48rpx;
 }
+
 .page-title {
 font-size: 56rpx;
 font-weight: 600;
 color: #F0F6FC;
 }
+
 /* Countdown Section */
 .countdown-section {
 margin-bottom: 48rpx;
 }
+
 .glass-card {
 background: rgba(22, 27, 34, 0.8);
 border: 1rpx solid rgba(240, 246, 252, 0.1);
@@ -285,34 +320,40 @@ border-radius: 24rpx;
 padding: 32rpx;
 backdrop-filter: blur(20rpx);
 }
+
 .countdown-header {
 display: flex;
 justify-content: space-between;
 align-items: flex-start;
 margin-bottom: 32rpx;
 }
+
 .countdown-label {
 font-size: 28rpx;
 color: #8B949E;
 margin-bottom: 16rpx;
 display: block;
 }
+
 .countdown-display-wrap {
 display: flex;
 align-items: flex-end;
 }
+
 .countdown-display {
 font-size: 112rpx;
 font-weight: 700;
 color: #58A6FF;
 line-height: 1;
 }
+
 .countdown-unit {
 font-size: 32rpx;
 color: #8B949E;
 margin-left: 8rpx;
 margin-bottom: 16rpx;
 }
+
 .progress-ring {
 width: 120rpx;
 height: 120rpx;
@@ -322,47 +363,56 @@ display: flex;
 align-items: center;
 justify-content: center;
 }
+
 .progress-percent {
 font-size: 28rpx;
 font-weight: 600;
 color: #58A6FF;
 }
+
 /* Stats Grid */
 .stats-grid {
 display: flex;
 gap: 24rpx;
 }
+
 .stat-card {
 flex: 1;
 background: rgba(30, 37, 46, 0.9);
 border-radius: 16rpx;
 padding: 24rpx;
 }
+
 .stat-card.highlight {
 background: rgba(88, 166, 255, 0.15);
 border: 1rpx solid rgba(88, 166, 255, 0.3);
 }
+
 .stat-label {
 font-size: 24rpx;
 color: #8B949E;
 display: block;
 margin-bottom: 8rpx;
 }
+
 .stat-value {
 font-size: 40rpx;
 font-weight: 600;
 color: #F0F6FC;
 }
+
 /* Info Section */
 .info-section {
 margin-bottom: 48rpx;
 }
+
 .glass-header {
 display: flex;
 align-items: center;
 gap: 24rpx;
 margin-bottom: 32rpx;
 }
+
 .header-icon {
 width: 80rpx;
 height: 80rpx;
@@ -372,14 +422,17 @@ display: flex;
 align-items: center;
 justify-content: center;
 }
+
 .icon-text {
 font-size: 40rpx;
 }
+
 .glass-title {
 font-size: 36rpx;
 font-weight: 600;
 color: #F0F6FC;
 }
+
 .retirement-date-box {
 display: flex;
 justify-content: space-between;
@@ -389,42 +442,50 @@ background: rgba(88, 166, 255, 0.08);
 border-radius: 16rpx;
 margin-bottom: 32rpx;
 }
+
 .retirement-date-large {
 font-size: 40rpx;
 font-weight: 600;
 color: #58A6FF;
 display: block;
 }
+
 .retirement-weekday {
 font-size: 28rpx;
 color: #8B949E;
 margin-top: 8rpx;
 display: block;
 }
+
 .tag-group {
 display: flex;
 flex-direction: column;
 gap: 16rpx;
 }
+
 .chip {
 padding: 8rpx 24rpx;
 border-radius: 32rpx;
 font-size: 24rpx;
 }
+
 .chip-primary {
 background: rgba(88, 166, 255, 0.2);
 color: #58A6FF;
 }
+
 .chip-success {
 background: rgba(63, 185, 80, 0.2);
 color: #3FB950;
 }
+
 /* Info Rows */
 .info-rows {
 display: flex;
 flex-direction: column;
 gap: 16rpx;
 }
+
 .info-row {
 display: flex;
 justify-content: space-between;
@@ -434,28 +495,34 @@ background: rgba(30, 37, 46, 0.9);
 border: 1rpx solid rgba(240, 246, 252, 0.1);
 border-radius: 16rpx;
 }
+
 .info-label {
 font-size: 30rpx;
 color: #8B949E;
 }
+
 .info-value-wrap {
 display: flex;
 align-items: center;
 gap: 16rpx;
 }
+
 .info-value {
 font-size: 30rpx;
 color: #F0F6FC;
 font-weight: 500;
 }
+
 .arrow {
 font-size: 32rpx;
 color: #8B949E;
 }
+
 /* Tips Section */
 .tips-section {
 margin-bottom: 48rpx;
 }
+
 .tips-title {
 font-size: 36rpx;
 font-weight: 600;
@@ -463,29 +530,35 @@ color: #F0F6FC;
 display: block;
 margin-bottom: 32rpx;
 }
+
 .tips-list {
 display: flex;
 flex-direction: column;
 gap: 24rpx;
 }
+
 .tips-item {
 font-size: 28rpx;
 color: #8B949E;
 line-height: 1.6;
 }
+
 /* Login Tip */
 .login-tip {
 margin-top: 32rpx;
 }
+
 .login-tip .glass-card {
 text-align: center;
 }
+
 .login-tip-text {
 color: #8B949E;
 font-size: 28rpx;
 display: block;
 margin-bottom: 24rpx;
 }
+
 .btn-primary {
 width: 100%;
 height: 88rpx;
