@@ -1,4 +1,4 @@
-const BASE_URL = 'https://uni.q-fan.cn/api'
+const BASE_URL = 'http://localhost:3001'
 
 export const request = (options) => {
   const token = uni.getStorageSync('token')
